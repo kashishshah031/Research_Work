@@ -502,6 +502,24 @@ class GNN_graphpred(torch.nn.Module):
         #self.gnn = GNN(self.num_layer, self.emb_dim, JK = self.JK, drop_ratio = self.drop_ratio)
         self.gnn.load_state_dict(torch.load(model_file))
 
+    def forward_emb(self, *argv):
+        """
+        Return graph-level embedding h_graph: [B, emb_dim].
+        Uses the same encoder (self.gnn) and pooling (self.pool) as forward().
+        """
+        if len(argv) == 1:
+            data = argv[0]
+            x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+        elif len(argv) == 4:
+            x, edge_index, edge_attr, batch = argv
+        else:
+            raise ValueError("forward_emb expects a Data object or (x, edge_index, edge_attr, batch)")
+
+        node_rep = self.gnn(x, edge_index, edge_attr)
+        graph_emb = self.pool(node_rep, batch)   # same pool used in forward()
+        return graph_emb
+
+    '''
     def forward(self, *argv):
         if len(argv) == 4:
             x, edge_index, edge_attr, batch = argv[0], argv[1], argv[2], argv[3]
@@ -514,7 +532,32 @@ class GNN_graphpred(torch.nn.Module):
         node_representation = self.gnn(x, edge_index, edge_attr)
 
         return self.graph_pred_linear(self.pool(node_representation, batch)), node_representation
+       '''
 
+    def forward(self, *argv, return_h: bool = False, return_nodes: bool = False):
+        if len(argv) == 4:
+            x, edge_index, edge_attr, batch = argv[0], argv[1], argv[2], argv[3]
+        elif len(argv) == 1:
+            data = argv[0]
+            x, edge_index, edge_attr, batch = data.x, data.edge_index, data.edge_attr, data.batch
+        else:
+            raise ValueError("unmatched number of arguments.")
+
+        node_representation = self.gnn(x, edge_index, edge_attr)  # [N_total, emb_dim]
+        H = self.pool(node_representation, batch)                 # <-- this is the latent H
+        logits = self.graph_pred_linear(H)
+
+        # New, flexible returns:
+        if return_h and return_nodes:
+            return logits, H, node_representation
+        elif return_h:
+            return logits, H
+        elif return_nodes:
+            return logits, node_representation
+        else:
+            # keep the old behavior for any existing code
+            return logits, node_representation
+ 
 
 if __name__ == "__main__":
     pass

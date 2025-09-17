@@ -257,6 +257,49 @@ def create_standardized_mol_id(smiles):
             return
     else:
         return
+# --- add in loader.py (after MoleculeDataset is defined) ---
+class QACSVLoader(InMemoryDataset):
+    """
+    Read a single CSV with columns: smiles,label
+    Produces PyG Data with .y = 0/1 for non-QAC/QAC.
+    Usage (example):
+        ds = QACSVLoader(csv_path="updated_dataset/qac_data.csv")
+    """
+    def __init__(self, root=None, csv_path="updated_dataset/qac_data.csv",
+                 transform=None, pre_transform=None):
+        self.csv_path = csv_path
+        super().__init__(root, transform, pre_transform)
+        self.data, self.slices = torch.load(self.processed_paths[0])
+
+    @property
+    def processed_file_names(self):
+        # single cached tensor file
+        return ["qac_csv.pt"]
+
+    def process(self):
+        assert os.path.exists(self.csv_path), f"Not found: {self.csv_path}"
+        df = pd.read_csv(self.csv_path)
+
+        data_list = []
+        for _, row in df.iterrows():
+            s = str(row["smiles"]).strip()
+            y = int(row["label"])
+            mol = AllChem.MolFromSmiles(s)
+            if mol is None:
+                continue
+            try:
+                data = mol_to_graph_data_obj_simple(mol)  # reuse your featurizer
+            except Exception:
+                continue
+            data.y = torch.tensor([y], dtype=torch.long)
+            data.smiles = s
+            data_list.append(data)
+
+        if self.pre_transform is not None:
+            data_list = [self.pre_transform(d) for d in data_list]
+
+        data, slices = self.collate(data_list)
+        torch.save((data, slices), self.processed_paths[0])
 
 class MyDataset(InMemoryDataset):
     def __init__(self, datasetA, datasetB):

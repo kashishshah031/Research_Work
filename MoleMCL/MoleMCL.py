@@ -181,6 +181,20 @@ def main():
     parser.add_argument('--seed', type=int, default=0, help = "Seed for splitting dataset.")
     parser.add_argument('--num_workers', type=int, default = 8, help='number of workers for dataset loading')
     parser.add_argument('--alpha', type=float, default = 1, help='loss_maskgcl = alpha * loss_mask + (1 - alpha) * loss_cl1')
+    # --- DCM pretraining (QAC vs non-QAC) flags ---
+    parser.add_argument('--dcm_pretrain', action='store_true',
+                        help='Run label-aware contrastive pretraining on QAC/non-QAC CSV instead of mask+CL.')
+    parser.add_argument('--qac_csv', type=str, default='updated_dataset/qac_data.csv',
+                        help='Path to CSV with columns: smiles,label (1=QAC, 0=non-QAC).')
+    parser.add_argument('--tau', type=float, default=0.2,
+                        help='Temperature for contrastive loss in DCM mode.')
+    parser.add_argument('--p_edge', type=float, default=0.1,
+                        help='Edge dropout probability for graph augmentation in DCM mode.')
+    parser.add_argument('--p_feat', type=float, default=0.1,
+                        help='Node feature masking probability for graph augmentation in DCM mode.')
+    parser.add_argument('--proj_dim', type=int, default=128,
+                        help='Projection head output dim in DCM mode.')
+
 
     args = parser.parse_args()
 
